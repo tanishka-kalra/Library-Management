@@ -1,8 +1,3 @@
-'''
-Author: Tanishka Kalra
-'''
-
-
 from fastapi import FastAPI
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
@@ -106,6 +101,7 @@ def get_data(id: int = 0,country: str="",age: int=-1):
             all_data=[{'name':doc['name'],'age':doc['age']} for doc in cursor]
             return {'data':all_data}
     else:
+        if ds.get(id)==None: return {'Message':"No data found"}
         cursor = collection.find({"_id":ObjectId(ds[id])})
         for doc in cursor:
             return {'name':doc['name'],'age':doc['age'],'address':doc['address']}
@@ -114,6 +110,8 @@ def get_data(id: int = 0,country: str="",age: int=-1):
 @app.delete("/students/{student_id}", status_code = 200)
 def delete_data(student_id : int):
     collection=details("studentInfo")
+    if ds.get(student_id)==None:
+        return {}
     roll_no = ds[student_id]
     collection.delete_one({"_id":ObjectId(roll_no)})
     collection=details("rollInfo")
@@ -128,6 +126,8 @@ def update_data(updated_data : dict):
     if updated_data.get("id")==None:
         return {'Message':'Id is required'}
     student_id=int(updated_data['id'])
+    if ds.get(student_id)==None:
+        return {"Message":"Invalid ID"}
     dataToUpdate={}
     if updated_data.get("name")!=None:
         dataToUpdate['name']=updated_data['name']
