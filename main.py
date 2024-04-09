@@ -124,10 +124,10 @@ def delete_data(student_id : int):
 def update_data(updated_data : dict):
     collection=details("studentInfo")
     if updated_data.get("id")==None:
-        return {'Message':'Id is required'}
+        return {}
     student_id=int(updated_data['id'])
     if ds.get(student_id)==None:
-        return {"Message":"Invalid ID"}
+        return {}
     dataToUpdate={}
     if updated_data.get("name")!=None:
         dataToUpdate['name']=updated_data['name']
