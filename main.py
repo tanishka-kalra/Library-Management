@@ -1,3 +1,8 @@
+'''
+Author: Tanishka Kalra
+'''
+
+
 from fastapi import FastAPI
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
@@ -7,6 +12,8 @@ import json
 
 app=FastAPI()
 ds={}
+
+#Function to create a connection to mongoDB
 def details(collectionName):
     username = data['user']
     password = data['pass']
@@ -24,10 +31,15 @@ count=99
 def loadData():
     global data
     global count
+
+    #Loading credentials from a config file
     with open('config.json','r')as file:
         data=json.load(file)
     collection=details("rollInfo")
     cursor = collection.find({})
+
+    #Logic to generate next roll number
+    #We are assuming that roll number starts from 100
     mx=99
     for doc in cursor:
         ds[doc['roll']]=doc['obj']
@@ -35,23 +47,20 @@ def loadData():
     count=mx+1
 
 
-loadData()
+loadData()   #Populating the roll number data structure
 
 
-
-
-
-
-
+#Utility function to add student to DB
 def addStudent(student):
     collection=details("studentInfo")
     result = collection.insert_one(student)
     return str(result.inserted_id)
 
+
+#Add student endpoint
 @app.post("/students",status_code=201)
 def create_student(student: dict):
     global count
-
     if student.get("name")==None:
         return {'Message':'Name Required'}
     if student.get("age")==None:
@@ -72,56 +81,59 @@ def create_student(student: dict):
     count=count+1
     return {'id' : roll_no}
 
+
+#Get student with filters endpoint
 @app.get("/students",status_code=200)
-def get_data(rollNo: int = 0,country: str="",age: int=-1):
+def get_data(id: int = 0,country: str="",age: int=-1):
     collection=details("studentInfo")
-    if rollNo==0:
+    if id==0:
         if len(country)==0 and age==-1:
             cursor = collection.find({})
             all_data=[]
             for doc in cursor:
                 all_data.append({"name":doc['name'],"age":doc["age"]})
-            return all_data
-        if len(country)>0 and age==-1:
+            return {'data':all_data}
+        if len(country)>0 and age==-1:  #Filter for only country
             cursor = collection.find({"address.country":country})
             all_data=[{'name':doc['name'],'age':doc['age']} for doc in cursor]
-            return all_data
-        if len(country)==0 and age!=-1:
+            return {'data':all_data}
+        if len(country)==0 and age!=-1:  #Filter for only age
             cursor = collection.find({"age":{"$gte":age}})
             all_data=[{'name':doc['name'],'age':doc['age']} for doc in cursor]
-            return all_data
-        if len(country)>0 and age!=-1:
+            return {'data':all_data}
+        if len(country)>0 and age!=-1:  #Filter for both country and age
             cursor = collection.find({"age":{"$gte":age},"address.country":country})
             all_data=[{'name':doc['name'],'age':doc['age']} for doc in cursor]
-            return all_data
+            return {'data':all_data}
     else:
-        cursor = collection.find({"_id":ObjectId(ds[rollNo])})
-        print(cursor)
+        cursor = collection.find({"_id":ObjectId(ds[id])})
         for doc in cursor:
             return {'name':doc['name'],'age':doc['age'],'address':doc['address']}
 
-@app.delete("/students", status_code = 200)
-def delete_data():
-    global count
-    collection=details("studentInfo")
-    result = collection.delete_many({})
-
-    collection=details("rollInfo")
-    collection.delete_many({})
-    count = 100
-    return {"message": f"Deleted {result.deleted_count} documents"}
-
+#Delete student on the basis of roll number endpoint
 @app.delete("/students/{student_id}", status_code = 200)
 def delete_data(student_id : int):
     collection=details("studentInfo")
     roll_no = ds[student_id]
-    result = collection.delete_one({"_id":ObjectId(roll_no)})
+    collection.delete_one({"_id":ObjectId(roll_no)})
     collection=details("rollInfo")
     collection.delete_one({"roll":student_id})
-    return {"message": f"Deleted {result.deleted_count} documents"}
+    return {}
 
+
+#Update student endpoint
 @app.patch("/students/{student_id}",status_code=204)
-def update_data( student_id : int ,updated_data : dict):
+def update_data(updated_data : dict):
     collection=details("studentInfo")
+    if updated_data.get("id")==None:
+        return {'Message':'Id is required'}
+    student_id=int(updated_data['id'])
+    dataToUpdate={}
+    if updated_data.get("name")!=None:
+        dataToUpdate['name']=updated_data['name']
+    if updated_data.get("age")!=None:
+        dataToUpdate['age']=updated_data['age']
+    if updated_data.get("address")!=None:
+        dataToUpdate['address']=updated_data['address']
     obj_id=ds[student_id]
-    collection.update_one({"_id": ObjectId(obj_id)}, {"$set": updated_data['updated_data']})
+    collection.update_one({"_id": ObjectId(obj_id)}, {"$set": dataToUpdate})
